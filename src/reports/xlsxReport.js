@@ -6,30 +6,35 @@ async function gerarXlsx(relatorio) {
   workbook.created = relatorio.geradoEm
 
   const resumo = workbook.addWorksheet('Resumo')
-  resumo.columns = [{ width: 32 }, { width: 22 }]
+  resumo.columns = [{ width: 42 }, { width: 26 }, { width: 18 }]
   resumo.addRows([
     ['Relatorio de controle glicemico e insulina'],
     ['Paciente', relatorio.usuario.nome],
     ['Data inicial', relatorio.periodo.dataInicio],
     ['Data final', relatorio.periodo.dataFim],
     ['Total de registros', relatorio.resumo.totalRegistros],
-    ['Dias analisados', relatorio.resumo.totalDias],
+    ['Dias com registros', relatorio.resumo.totalDias],
     ['Glicose media (mg/dL)', relatorio.resumo.media],
     ['Menor glicose (mg/dL)', relatorio.resumo.minimo],
     ['Maior glicose (mg/dL)', relatorio.resumo.maximo],
     ['CV (%)', relatorio.resumo.cv],
     ['GMI estimado (%)', relatorio.resumo.gmi],
     ['Insulina total (UI)', relatorio.resumo.totalInsulina],
-    ['Media diaria de insulina (UI)', relatorio.resumo.mediaDiariaInsulina]
+    ['Media de insulina por dia com registros (UI)', relatorio.resumo.mediaDiariaInsulina],
+    ['Dias com hipoglicemia', relatorio.resumo.diasHipoglicemia],
+    ['Dias com glicose acima de 250 mg/dL', relatorio.resumo.diasHiperglicemiaImportante],
+    ['Registros abaixo de 70 mg/dL (%)', relatorio.resumo.percentualAbaixoAlvo],
+    ['Registros na faixa alvo (%)', relatorio.resumo.percentualAlvo],
+    ['Registros acima de 180 mg/dL (%)', relatorio.resumo.percentualAcimaAlvo]
   ])
   resumo.getRow(1).font = { bold: true, size: 16, color: { argb: 'FF176B87' } }
 
   resumo.addRow([])
   resumo.addRow(['Faixa glicemica', 'Quantidade', 'Percentual'])
   for (const faixa of relatorio.resumo.faixas) {
-    resumo.addRow([faixa.descricao, faixa.quantidade, faixa.percentual / 100])
+    const linha = resumo.addRow([faixa.descricao, faixa.quantidade, faixa.percentual / 100])
+    linha.getCell(3).numFmt = '0.0%'
   }
-  for (let linha = 16; linha <= 20; linha += 1) resumo.getCell(linha, 3).numFmt = '0.0%'
 
   const registros = workbook.addWorksheet('Registros')
   registros.columns = [
@@ -52,7 +57,7 @@ async function gerarXlsx(relatorio) {
       glicose: registro.glicose,
       classificacao: registro.classificacao,
       periodo: registro.periodo,
-      totalInsulina: registro.totalInsulina || '',
+      totalInsulina: registro.totalInsulina,
       tipos: registro.insulinas.map(item => `${item.tipo}: ${item.unidades} UI`).join(', '),
       observacao: registro.observacao
     })

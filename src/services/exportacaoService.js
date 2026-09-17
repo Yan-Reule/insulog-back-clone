@@ -75,7 +75,7 @@ function validarData(data, campo) {
   const formato = /^\d{4}-\d{2}-\d{2}$/
   const objeto = new Date(`${data}T00:00:00Z`)
 
-  if (!formato.test(data) || Number.isNaN(objeto.getTime()) || objeto.toISOString().slice(0, 10) !== data) {
+  if (typeof data !== 'string' || !formato.test(data) || Number.isNaN(objeto.getTime()) || objeto.toISOString().slice(0, 10) !== data || data < '1000-01-01') {
     const error = new Error(`${campo} deve estar no formato YYYY-MM-DD e ser uma data valida`)
     error.statusCode = 400
     throw error
@@ -89,6 +89,12 @@ async function gerarRelatorio({ idUsuario, dataInicio, dataFim, formato }) {
     throw error
   }
 
+  if (!['string', 'number'].includes(typeof idUsuario) || !/^[1-9]\d*$/.test(String(idUsuario)) || !Number.isSafeInteger(Number(idUsuario))) {
+    const error = new Error('Usuario deve ser um identificador inteiro positivo')
+    error.statusCode = 400
+    throw error
+  }
+
   validarData(dataInicio, 'Data inicial')
   validarData(dataFim, 'Data final')
 
@@ -98,7 +104,7 @@ async function gerarRelatorio({ idUsuario, dataInicio, dataFim, formato }) {
     throw error
   }
 
-  const formatoNormalizado = String(formato || 'pdf').toLowerCase()
+  const formatoNormalizado = formato === undefined ? 'pdf' : (typeof formato === 'string' ? formato.toLowerCase() : '')
   if (!['pdf', 'xlsx'].includes(formatoNormalizado)) {
     const error = new Error('Formato deve ser pdf ou xlsx')
     error.statusCode = 400
@@ -106,9 +112,9 @@ async function gerarRelatorio({ idUsuario, dataInicio, dataFim, formato }) {
   }
 
   const dados = await exportacaoRepository.findDadosRelatorio(
-    idUsuario,
+    Number(idUsuario),
     `${dataInicio} 00:00:00`,
-    `${dataFim} 23:59:59`
+    dataFim
   )
 
   if (!dados) {

@@ -57,6 +57,9 @@ function calcularResumo(registros) {
   }, 0)
 
   const dias = new Set(registros.map(registro => String(registro.dataHora).slice(0, 10))).size
+  const diasNaFaixa = teste => new Set(registros.filter(registro => teste(registro.glicose))
+    .map(registro => String(registro.dataHora).slice(0, 10))).size
+  const percentual = teste => arredondar((valores.filter(teste).length / total) * 100)
 
   return {
     totalRegistros: total,
@@ -64,10 +67,15 @@ function calcularResumo(registros) {
     media: arredondar(media),
     minimo: Math.min(...valores),
     maximo: Math.max(...valores),
-    cv: arredondar((Math.sqrt(variancia) / media) * 100),
+    cv: media === 0 ? 0 : arredondar((Math.sqrt(variancia) / media) * 100),
     gmi: arredondar(3.31 + (0.02392 * media), 2),
     totalInsulina: arredondar(totalInsulina, 2),
     mediaDiariaInsulina: arredondar(totalInsulina / dias, 2),
+    diasHipoglicemia: diasNaFaixa(valor => valor < 70),
+    diasHiperglicemiaImportante: diasNaFaixa(valor => valor > 250),
+    percentualAbaixoAlvo: percentual(valor => valor < 70),
+    percentualAlvo: percentual(valor => valor >= 70 && valor <= 180),
+    percentualAcimaAlvo: percentual(valor => valor > 180),
     faixas: FAIXAS.map(faixa => ({
       descricao: faixa.descricao,
       quantidade: contagens[faixa.chave],

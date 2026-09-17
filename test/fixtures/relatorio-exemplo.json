@@ -1,0 +1,16 @@
+{
+  "usuario": { "id_usuario": 19, "nome": "João Henrique Almeida", "email": "joao.exemplo@insulog.local" },
+  "registros": [
+    { "id_registro": 1001, "nivel_glicose": 48, "data_hora": "2026-08-01 06:42:00", "observacao": "Acordou com tremor e suor frio", "periodo": "Jejum", "id_registro_insulina": null, "unidade_insulina": null, "tipo_insulina": null },
+    { "id_registro": 1002, "nivel_glicose": 92, "data_hora": "2026-08-01 12:15:00", "observacao": "Antes do almoço", "periodo": "Pré-prandial", "id_registro_insulina": 501, "unidade_insulina": 6, "tipo_insulina": "Rápida" },
+    { "id_registro": 1003, "nivel_glicose": 146, "data_hora": "2026-08-01 15:10:00", "observacao": "", "periodo": "Pós-prandial", "id_registro_insulina": null, "unidade_insulina": null, "tipo_insulina": null },
+    { "id_registro": 1004, "nivel_glicose": 268, "data_hora": "2026-08-02 21:08:00", "observacao": "Jantar com maior quantidade de carboidratos", "periodo": "Pós-prandial", "id_registro_insulina": 502, "unidade_insulina": 4, "tipo_insulina": "Rápida" },
+    { "id_registro": 1004, "nivel_glicose": 268, "data_hora": "2026-08-02 21:08:00", "observacao": "Jantar com maior quantidade de carboidratos", "periodo": "Pós-prandial", "id_registro_insulina": 503, "unidade_insulina": 18, "tipo_insulina": "Basal" },
+    { "id_registro": 1005, "nivel_glicose": 67, "data_hora": "2026-08-05 03:24:00", "observacao": "Hipoglicemia noturna corrigida", "periodo": "Madrugada", "id_registro_insulina": null, "unidade_insulina": null, "tipo_insulina": null },
+    { "id_registro": 1006, "nivel_glicose": 178, "data_hora": "2026-08-07 07:03:00", "observacao": "", "periodo": "Jejum", "id_registro_insulina": 504, "unidade_insulina": 5, "tipo_insulina": "Rápida" },
+    { "id_registro": 1007, "nivel_glicose": 213, "data_hora": "2026-08-12 14:37:00", "observacao": "Após sobremesa", "periodo": "Pós-prandial", "id_registro_insulina": 505, "unidade_insulina": 3.5, "tipo_insulina": "Rápida" },
+    { "id_registro": 1008, "nivel_glicose": 121, "data_hora": "2026-08-18 18:22:00", "observacao": "Antes do jantar", "periodo": "Pré-prandial", "id_registro_insulina": 506, "unidade_insulina": 7, "tipo_insulina": "Rápida" },
+    { "id_registro": 1009, "nivel_glicose": 84, "data_hora": "2026-08-24 09:45:00", "observacao": "Após caminhada", "periodo": "Pós-exercício", "id_registro_insulina": null, "unidade_insulina": null, "tipo_insulina": null },
+    { "id_registro": 1010, "nivel_glicose": 305, "data_hora": "2026-08-31 22:11:00", "observacao": "Correção aplicada", "periodo": "Noturno", "id_registro_insulina": 507, "unidade_insulina": 5, "tipo_insulina": "Ultrarrápida" }
+  ]
+}

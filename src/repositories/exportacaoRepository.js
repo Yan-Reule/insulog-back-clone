@@ -105,7 +105,8 @@ async function findDadosRelatorio(idUsuario, dataInicio, dataFim) {
     LEFT JOIN periodo p ON p.id_periodo = rg.id_periodo
     LEFT JOIN registroinsulina ri ON ri.id_registro = rg.id_registro
     LEFT JOIN tipoinsulina ti ON ti.id_tipo_insulina = ri.id_tipo_insulina
-    WHERE rg.id_usuario = ? AND rg.data_hora BETWEEN ? AND ?
+    WHERE rg.id_usuario = ? AND rg.data_hora >= ?
+      AND rg.data_hora < DATE_ADD(?, INTERVAL 1 DAY)
     ORDER BY rg.data_hora ASC, ri.id_registro_insulina ASC`,
     [idUsuario, dataInicio, dataFim]
   )
