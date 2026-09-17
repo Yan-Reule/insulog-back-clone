@@ -1,0 +1,15 @@
+{
+  "pages": 56,
+  "size": "A4",
+  "margins_pt": 57,
+  "findings": 10,
+  "severity": {
+    "crítica": 2,
+    "alta": 6,
+    "média": 2,
+    "baixa": 0,
+    "informativa": 0
+  },
+  "max_content_bottom": 776.4914062499998,
+  "note": "Layout vetorial. Rasterizar e inspecionar antes de entregar."
+}

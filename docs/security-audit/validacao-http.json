@@ -1,0 +1,357 @@
+{
+  "explanation": "49 requisições locais: 48 registros de rota alcançáveis e uma verificação de sombreamento; banco simulado, sem dados reais. Isto confirma o fluxo HTTP/serviço/SQL, não constraints do banco de produção.",
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 0
+    },
+    {
+      "method": "GET",
+      "url": "/usuarios",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/usuarios/19",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/usuarios",
+      "status": 201,
+      "authentication": "nenhuma",
+      "sqlCalls": 3
+    },
+    {
+      "method": "PUT",
+      "url": "/usuarios/19",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/login",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "DELETE",
+      "url": "/usuarios/19",
+      "status": 204,
+      "authentication": "nenhuma",
+      "sqlCalls": 4
+    },
+    {
+      "method": "GET",
+      "url": "/usuarios/medico",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/periodos",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/periodos/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/periodos",
+      "status": 201,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "PUT",
+      "url": "/periodos/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "DELETE",
+      "url": "/periodos/1004",
+      "status": 204,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "GET",
+      "url": "/tipos-insulina",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/tipos-insulina/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/tipos-insulina",
+      "status": 201,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "PUT",
+      "url": "/tipos-insulina/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "DELETE",
+      "url": "/tipos-insulina/1004",
+      "status": 204,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "GET",
+      "url": "/registros-glicose",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/registros-glicose/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/registros-glicose",
+      "status": 201,
+      "authentication": "nenhuma",
+      "sqlCalls": 3
+    },
+    {
+      "method": "PUT",
+      "url": "/registros-glicose/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 3
+    },
+    {
+      "method": "DELETE",
+      "url": "/registros-glicose/1004",
+      "status": 204,
+      "authentication": "nenhuma",
+      "sqlCalls": 4
+    },
+    {
+      "method": "GET",
+      "url": "/registros-insulina",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/registros-insulina/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/registros-insulina",
+      "status": 201,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "PUT",
+      "url": "/registros-insulina/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "DELETE",
+      "url": "/registros-insulina/1004",
+      "status": 204,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "GET",
+      "url": "/alarmes",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/alarmes/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/alarmes",
+      "status": 201,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "PUT",
+      "url": "/alarmes/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "DELETE",
+      "url": "/alarmes/1004",
+      "status": 204,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "GET",
+      "url": "/configuracoes",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/configuracoes/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/configuracoes",
+      "status": 201,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "PUT",
+      "url": "/configuracoes/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "DELETE",
+      "url": "/configuracoes/1004",
+      "status": 204,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "GET",
+      "url": "/exportacoes",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/exportacoes/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "POST",
+      "url": "/exportacoes",
+      "status": 201,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "PUT",
+      "url": "/exportacoes/1004",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "DELETE",
+      "url": "/exportacoes/1004",
+      "status": 204,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    },
+    {
+      "method": "GET",
+      "url": "/alarmes/usuario/19",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/registros-insulina/usuario/19",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/registros-glicose/usuario/19",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/registros-glicose/usuario/19/historico?dataInicio=2026-08-01&dataFim=2026-08-31",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/registros-glicose/dashboard?id_usuario=19&dataInicio=2026-08-01&dataFim=2026-08-31",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 1
+    },
+    {
+      "method": "GET",
+      "url": "/exportacoes/relatorio?id_usuario=19&dataInicio=2026-08-01&dataFim=2026-08-31",
+      "status": 200,
+      "authentication": "nenhuma",
+      "sqlCalls": 2
+    }
+  ],
+  "assertions": [
+    "listagem expõe senha",
+    "troca anônima de senha aceita no login",
+    "escritas anônimas alcançam SQL",
+    "relatório anônimo PDF",
+    "logs contêm credenciais",
+    "rota por tipo sombreada"
+  ],
+  "pass": true
+}

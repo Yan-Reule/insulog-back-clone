@@ -1,0 +1,1218 @@
+{
+  "project": "Insulog (api-insulog + app Flutter)",
+  "date": "17/09/2026",
+  "backend_head": "feb285d76d9b059e5e2f440c55472a95abbd06ca",
+  "frontend_head": "ee623bbf1b0a538e140141388dab23982705677b",
+  "findings": [
+    {
+      "id": "A01",
+      "severity": "alta",
+      "category": "1. Isolamento",
+      "title": "Listagens globais expõem dados e hashes de senha",
+      "description": "As seis listagens de dados privados não recebem identidade autenticada e executam consultas sem filtro de dono. GET /usuarios devolve SELECT * diretamente, incluindo a coluna senha. Os IDs expostos também facilitam as referências diretas dos demais achados.",
+      "impact": "Leitura em massa de contas, hashes scrypt, medições, doses, alarmes, preferências e metadados de exportação. Se houver contas legadas em texto puro, a senha também é retornada; a existência delas em produção não foi aferida.",
+      "condition": "Acesso de rede à API e linhas existentes nas tabelas; não depende de login ou feature flag. Hashes não equivalem automaticamente a senhas recuperadas.",
+      "evidence": [
+        {
+          "file": "src/controllers/userController.js",
+          "start": 3,
+          "end": 6,
+          "code": "3: async function index(req, res, next) {\n4:   try {\n5:     const users = await userService.listUsers()\n6:     return res.status(200).json(users)"
+        },
+        {
+          "file": "src/repositories/userRepository.js",
+          "start": 4,
+          "end": 9,
+          "code": "4: async function findAll() {\n5:   const [rows] = await db.execute(\n6:     'SELECT * FROM usuario ORDER BY id_usuario ASC'\n7:   )\n8: \n9:   return rows"
+        },
+        {
+          "file": "src/repositories/registroGlicoseRepository.js",
+          "start": 5,
+          "end": 9,
+          "code": "5:   const [rows] = await db.execute(\n6:     `SELECT rg.id_registro, rg.id_usuario, rg.nivel_glicose, rg.data_hora, p.descricao AS periodo\n7:      FROM registroglicose rg\n8:      LEFT JOIN periodo p ON p.id_periodo = rg.id_periodo\n9:      ORDER BY rg.id_registro ASC`"
+        },
+        {
+          "file": "src/repositories/registroInsulinaRepository.js",
+          "start": 4,
+          "end": 7,
+          "code": "4: async function findAll() {\n5:   const [rows] = await db.execute(\n6:     'SELECT id_registro_insulina, id_registro, id_tipo_insulina, unidade_insulina FROM registroinsulina ORDER BY id_registro_insulina ASC'\n7:   )"
+        },
+        {
+          "file": "src/repositories/alarmeRepository.js",
+          "start": 14,
+          "end": 17,
+          "code": "14: async function findAll() {\n15:   const [rows] = await db.execute(\n16:     'SELECT id_alarme, id_usuario, data_hora, id_periodo, id_registro, dias_semana, ativo, tem_som, tem_vibracao FROM alarme ORDER BY id_alarme ASC'\n17:   )"
+        },
+        {
+          "file": "src/repositories/configuracaoRepository.js",
+          "start": 4,
+          "end": 7,
+          "code": "4: async function findAll() {\n5:   const [rows] = await db.execute(\n6:     'SELECT id_configuracao, id_usuario, idioma, tema, notificacoes FROM configuracao ORDER BY id_configuracao ASC'\n7:   )"
+        },
+        {
+          "file": "src/repositories/exportacaoRepository.js",
+          "start": 4,
+          "end": 7,
+          "code": "4: async function findAll() {\n5:   const [rows] = await db.execute(\n6:     'SELECT id_exportacao, id_usuario, data, descricao FROM exportacao ORDER BY id_exportacao ASC'\n7:   )"
+        },
+        {
+          "file": "src/services/passwordService.js",
+          "start": 42,
+          "end": 47,
+          "code": "42:   if (isHashedPassword(storedPassword)) {\n43:     return verifyHashedPassword(password, storedPassword)\n44:   }\n45: \n46:   // Compatibilidade temporaria com usuarios antigos salvos em texto puro.\n47:   return storedPassword === password"
+        }
+      ],
+      "fix": "Exigir identidade validada, filtrar cada coleção pelo dono autorizado ou vínculo médico-paciente verificado e retornar DTOs com lista explícita de campos. Nunca serializar senha/hash. Migrar senhas legadas caso existam.",
+      "accept": [
+        "Anônimo recebe 401 nas seis coleções privadas.",
+        "Usuário A não recebe nenhuma linha de B, inclusive nas junções de insulina.",
+        "Respostas de usuários nunca contêm senha, hash ou salt.",
+        "Vínculo médico-paciente é validado no servidor antes de permitir leitura."
+      ]
+    },
+    {
+      "id": "A02",
+      "severity": "crítica",
+      "category": "3. IDOR",
+      "title": "Conta de terceiros pode ser alterada, inclusive a senha",
+      "description": "GET, PUT e DELETE /usuarios/:id confiam apenas no ID. A atualização aceita uma nova senha, gera o hash e atualiza a conta sem sessão, senha atual ou fluxo de recuperação. A reprodução local mudou a senha de uma conta fictícia e realizou login com a nova senha.",
+      "impact": "Tomada de conta e alteração de nome, e-mail e tipo de usuário; leitura de perfil. Exclusão também alcança SQL sem autorização, podendo depender das foreign keys e dos registros vinculados.",
+      "condition": "API acessível e ID existente. Para atualização, enviar os campos obrigatórios; nenhuma credencial prévia é exigida. DELETE pode ser impedido por integridade referencial, sem corrigir a falha de autorização.",
+      "evidence": [
+        {
+          "file": "src/routes/userRoutes.js",
+          "start": 8,
+          "end": 14,
+          "code": "8: router.get('/', userController.index);\n9: router.get('/:id', userController.show);\n10: router.get('/:tipo_usuario', userController.showByType);\n11: \n12: router.post('/', userController.create);\n13: router.delete('/:id', userController.deleteById);\n14: router.put('/:id', userController.update);"
+        },
+        {
+          "file": "src/controllers/userController.js",
+          "start": 53,
+          "end": 57,
+          "code": "53: async function update(req, res, next) {\n54:   try {\n55:     const { id } = req.params\n56:     const user = await userService.updateUser(id, req.body)\n57:     return res.status(200).json(user)"
+        },
+        {
+          "file": "src/services/userService.js",
+          "start": 78,
+          "end": 91,
+          "code": "78: async function updateUser(id, data) {\n79:   const { nome, email, senha, tipo_login, tipo_usuario, id_medico, crm } = data\n80: \n81:   if (!nome || !email || !senha || !tipo_login || !tipo_usuario) {\n82:     const error = new Error('Todos os campos sao obrigatorios')\n83:     error.statusCode = 400\n84:     throw error\n85:   }\n86: \n87:   const senhaCriptografada = passwordService.hashPassword(senha)\n88: \n89:   return await userRepository.update(\n90:     id,\n91:     { nome, email, senha: senhaCriptografada, tipo_login, tipo_usuario, id_medico, crm }"
+        },
+        {
+          "file": "src/repositories/userRepository.js",
+          "start": 42,
+          "end": 45,
+          "code": "42: async function findById(id) {\n43:   const [rows] = await db.execute(\n44:     'SELECT id_usuario, nome, email, tipo_login, tipo_usuario FROM usuario WHERE id_usuario = ?',\n45:     [id]"
+        },
+        {
+          "file": "src/repositories/userRepository.js",
+          "start": 134,
+          "end": 136,
+          "code": "134:     await conn.execute(\n135:       'UPDATE usuario SET nome = ?, email = ?, senha = ?, tipo_login = ?, tipo_usuario = ? WHERE id_usuario = ?',\n136:       [nome, email, senha, tipo_login, tipo_usuario, id]"
+        },
+        {
+          "file": "src/repositories/userRepository.js",
+          "start": 18,
+          "end": 30,
+          "code": "18:     await conn.execute(\n19:       'DELETE FROM paciente WHERE id_usuario = ?',\n20:       [id]\n21:     )\n22: \n23:     await conn.execute(\n24:       'DELETE FROM medico WHERE id_usuario = ?',\n25:       [id]\n26:     )\n27: \n28:     await conn.execute(\n29:       'DELETE FROM usuario WHERE id_usuario = ?',\n30:       [id]"
+        }
+      ],
+      "fix": "Autenticar as rotas, vincular o perfil à identidade do servidor e exigir autorização específica para terceiros. Separar troca de senha de edição comum, com reautenticação ou token de recuperação de uso único; limitar exclusão.",
+      "accept": [
+        "Anônimo não consulta, altera nem exclui contas.",
+        "Usuário A não altera nem remove B ao trocar o ID.",
+        "Troca de senha exige prova adicional e revoga sessões conforme a política.",
+        "Senha/e-mail de B permanecem intactos após tentativa não autorizada."
+      ]
+    },
+    {
+      "id": "A03",
+      "severity": "crítica",
+      "category": "3. IDOR",
+      "title": "Registros clínicos e objetos vinculados não validam posse",
+      "description": "Os handlers de glicose, insulina, alarmes, configurações e metadados de exportação usam IDs de path/body/query sem comparar com dono autenticado. Verificar existência com findById não valida posse. POST aceita id_usuario ou id_registro de terceiros; PUT pode mudar esses vínculos. Dashboard e histórico também aceitam o paciente escolhido pelo chamador.",
+      "impact": "Leitura, criação, adulteração e exclusão de medições e doses de terceiros; alteração de alarmes e preferências. O impacto crítico decorre da integridade dos registros clínicos, não de um comando demonstrado a dispositivo de administração de insulina.",
+      "condition": "API alcançável e IDs/referências válidos. Constraints podem rejeitar IDs inexistentes, mas não isolam donos existentes. Sem feature flag ou sessão necessária.",
+      "evidence": [
+        {
+          "file": "src/controllers/registroGlicoseController.js",
+          "start": 44,
+          "end": 48,
+          "code": "44: async function getDashboard(req, res, next) {\n45:   try {\n46:     const { id_usuario, dataInicio, dataFim } = req.query\n47:     const dashboardDados = await registroGlicoseService.getDashboardDados(id_usuario, dataInicio, dataFim)\n48:     return res.status(200).json(dashboardDados)"
+        },
+        {
+          "file": "src/services/registroGlicoseService.js",
+          "start": 125,
+          "end": 130,
+          "code": "125: function montarRegistroCompleto(data, registroAtual = {}) {\n126:   const id_usuario = data.id_usuario ?? registroAtual.id_usuario\n127:   const nivel_glicose = data.nivel_glicose ?? registroAtual.nivel_glicose\n128:   const id_periodo = data.id_periodo ?? registroAtual.id_periodo\n129:   const data_hora = data.data_hora ?? registroAtual.data_hora ?? formatarDataHoraAtual()\n130:   const observacao = data.observacao ?? registroAtual.observacao ?? null"
+        },
+        {
+          "file": "src/services/registroGlicoseService.js",
+          "start": 356,
+          "end": 365,
+          "code": "356: async function updateRegistroGlicose(id, data) {\n357:   const registroGlicose = await registroGlicoseRepository.findById(id)\n358: \n359:   if (!registroGlicose) {\n360:     const error = new Error('Registro de glicose nao encontrado')\n361:     error.statusCode = 404\n362:     throw error\n363:   }\n364: \n365:   const glicose = montarRegistroCompleto(data, registroGlicose)"
+        },
+        {
+          "file": "src/repositories/registroGlicoseRepository.js",
+          "start": 51,
+          "end": 54,
+          "code": "51:     LEFT JOIN alarme a ON a.id_registro = rg.id_registro\n52:     LEFT JOIN periodo pl ON pl.id_periodo = a.id_periodo\n53:     WHERE rg.id_registro = ?`,\n54:     [id]"
+        },
+        {
+          "file": "src/repositories/registroGlicoseRepository.js",
+          "start": 197,
+          "end": 205,
+          "code": "197:     await conn.execute(\n198:       'UPDATE registroglicose SET id_usuario = ?, nivel_glicose = ?, data_hora = ?, id_periodo = ?, observacao = ? WHERE id_registro = ?',\n199:       [\n200:         glicose.id_usuario,\n201:         glicose.nivel_glicose,\n202:         glicose.data_hora,\n203:         glicose.id_periodo,\n204:         glicose.observacao ?? null,\n205:         id"
+        },
+        {
+          "file": "src/repositories/registroGlicoseRepository.js",
+          "start": 277,
+          "end": 290,
+          "code": "277:     await conn.execute(\n278:       'DELETE FROM alarme WHERE id_registro = ?',\n279:       [id]\n280:     )\n281: \n282:     await conn.execute(\n283:       'DELETE FROM registroinsulina WHERE id_registro = ?',\n284:       [id]\n285:     )\n286: \n287:     await conn.execute(\n288:       'DELETE FROM registroglicose WHERE id_registro = ?',\n289:       [id]\n290:     )"
+        },
+        {
+          "file": "src/repositories/registroGlicoseRepository.js",
+          "start": 304,
+          "end": 310,
+          "code": "304:   const [rows] = await db.execute(\n305:     `SELECT rg.id_registro, rg.id_usuario, rg.nivel_glicose, rg.data_hora, p.descricao AS periodo\n306:      FROM registroglicose rg\n307:      LEFT JOIN periodo p ON p.id_periodo = rg.id_periodo\n308:      WHERE rg.id_usuario = ? AND rg.data_hora BETWEEN ? AND ?\n309:      ORDER BY rg.data_hora ${ordemData}`,\n310:     [id_usuario, dataInicio, dataFim]"
+        },
+        {
+          "file": "src/repositories/registroInsulinaRepository.js",
+          "start": 12,
+          "end": 15,
+          "code": "12: async function findById(id) {\n13:   const [rows] = await db.execute(\n14:     'SELECT id_registro_insulina, id_registro, id_tipo_insulina, unidade_insulina FROM registroinsulina WHERE id_registro_insulina = ?',\n15:     [id]"
+        },
+        {
+          "file": "src/repositories/registroInsulinaRepository.js",
+          "start": 51,
+          "end": 54,
+          "code": "51:     const [result] = await conn.execute(\n52:       'INSERT INTO registroinsulina (id_registro, id_tipo_insulina, unidade_insulina) VALUES (?, ?, ?)',\n53:       [id_registro, id_tipo_insulina, unidade_insulina]\n54:     )"
+        },
+        {
+          "file": "src/repositories/registroInsulinaRepository.js",
+          "start": 79,
+          "end": 81,
+          "code": "79:     await conn.execute(\n80:       'UPDATE registroinsulina SET id_registro = ?, id_tipo_insulina = ?, unidade_insulina = ? WHERE id_registro_insulina = ?',\n81:       [id_registro, id_tipo_insulina, unidade_insulina, id]"
+        },
+        {
+          "file": "src/repositories/registroInsulinaRepository.js",
+          "start": 100,
+          "end": 104,
+          "code": "100: async function deleteById(id) {\n101:   await db.execute(\n102:     'DELETE FROM registroinsulina WHERE id_registro_insulina = ?',\n103:     [id]\n104:   )"
+        },
+        {
+          "file": "src/repositories/alarmeRepository.js",
+          "start": 22,
+          "end": 25,
+          "code": "22: async function findByUsuarioId(usuarioId) {\n23:   const [rows] = await db.execute(\n24:     'SELECT id_alarme, id_usuario, data_hora, id_periodo, id_registro, dias_semana, ativo, tem_som, tem_vibracao FROM alarme WHERE id_usuario = ? ORDER BY data_hora ASC',\n25:     [usuarioId]"
+        },
+        {
+          "file": "src/repositories/alarmeRepository.js",
+          "start": 30,
+          "end": 33,
+          "code": "30: async function findById(id) {\n31:   const [rows] = await db.execute(\n32:     'SELECT id_alarme, id_usuario, data_hora, id_periodo, id_registro, dias_semana, ativo, tem_som, tem_vibracao FROM alarme WHERE id_alarme = ?',\n33:     [id]"
+        },
+        {
+          "file": "src/repositories/alarmeRepository.js",
+          "start": 46,
+          "end": 48,
+          "code": "46:     const [result] = await conn.execute(\n47:       'INSERT INTO alarme (id_usuario, data_hora, id_periodo, id_registro, dias_semana, ativo, tem_som, tem_vibracao) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',\n48:       [id_usuario, data_hora, id_periodo || null, id_registro || null, dias_semana.join(','), ativo, tem_som, tem_vibracao]"
+        },
+        {
+          "file": "src/repositories/alarmeRepository.js",
+          "start": 79,
+          "end": 81,
+          "code": "79:     await conn.execute(\n80:       'UPDATE alarme SET id_usuario = ?, data_hora = ?, id_periodo = ?, id_registro = ?, dias_semana = ?, ativo = ?, tem_som = ?, tem_vibracao = ? WHERE id_alarme = ?',\n81:       [id_usuario, data_hora, id_periodo || null, id_registro || null, dias_semana.join(','), ativo, tem_som, tem_vibracao, id]"
+        },
+        {
+          "file": "src/repositories/alarmeRepository.js",
+          "start": 105,
+          "end": 108,
+          "code": "105: async function deleteById(id) {\n106:   await db.execute(\n107:     'DELETE FROM alarme WHERE id_alarme = ?',\n108:     [id]"
+        },
+        {
+          "file": "src/repositories/configuracaoRepository.js",
+          "start": 12,
+          "end": 15,
+          "code": "12: async function findById(id) {\n13:   const [rows] = await db.execute(\n14:     'SELECT id_configuracao, id_usuario, idioma, tema, notificacoes FROM configuracao WHERE id_configuracao = ?',\n15:     [id]"
+        },
+        {
+          "file": "src/repositories/configuracaoRepository.js",
+          "start": 28,
+          "end": 30,
+          "code": "28:     const [result] = await conn.execute(\n29:       'INSERT INTO configuracao (id_usuario, idioma, tema, notificacoes) VALUES (?, ?, ?, ?)',\n30:       [id_usuario, idioma, tema, notificacoes]"
+        },
+        {
+          "file": "src/repositories/configuracaoRepository.js",
+          "start": 57,
+          "end": 59,
+          "code": "57:     await conn.execute(\n58:       'UPDATE configuracao SET id_usuario = ?, idioma = ?, tema = ?, notificacoes = ? WHERE id_configuracao = ?',\n59:       [id_usuario, idioma, tema, notificacoes, id]"
+        },
+        {
+          "file": "src/repositories/configuracaoRepository.js",
+          "start": 79,
+          "end": 82,
+          "code": "79: async function deleteById(id) {\n80:   await db.execute(\n81:     'DELETE FROM configuracao WHERE id_configuracao = ?',\n82:     [id]"
+        },
+        {
+          "file": "src/repositories/exportacaoRepository.js",
+          "start": 12,
+          "end": 15,
+          "code": "12: async function findById(id) {\n13:   const [rows] = await db.execute(\n14:     'SELECT id_exportacao, id_usuario, data, descricao FROM exportacao WHERE id_exportacao = ?',\n15:     [id]"
+        },
+        {
+          "file": "src/repositories/exportacaoRepository.js",
+          "start": 28,
+          "end": 30,
+          "code": "28:     const [result] = await conn.execute(\n29:       'INSERT INTO exportacao (id_usuario, data, descricao) VALUES (?, ?, ?)',\n30:       [id_usuario, data, descricao]"
+        },
+        {
+          "file": "src/repositories/exportacaoRepository.js",
+          "start": 56,
+          "end": 58,
+          "code": "56:     await conn.execute(\n57:       'UPDATE exportacao SET id_usuario = ?, data = ?, descricao = ? WHERE id_exportacao = ?',\n58:       [id_usuario, data, descricao, id]"
+        },
+        {
+          "file": "src/repositories/exportacaoRepository.js",
+          "start": 77,
+          "end": 80,
+          "code": "77: async function deleteById(id) {\n78:   await db.execute(\n79:     'DELETE FROM exportacao WHERE id_exportacao = ?',\n80:     [id]"
+        }
+      ],
+      "fix": "Exigir sessão e aplicar predicados de dono em leitura e escrita. Para insulina, validar o dono pela junção com registroglicose. Derivar id_usuario da sessão, verificar referências cruzadas e impedir transferência arbitrária de dono; manter verificação e mutação na mesma transação quando necessário.",
+      "accept": [
+        "Todos os handlers privados da matriz rejeitam anônimos.",
+        "IDs de B em path, query e body de A são rejeitados sem alteração de estado.",
+        "POST de insulina/alarme não permite referência a registro de outro paciente.",
+        "Dashboard, histórico e buscas por usuário não revelam dados de B.",
+        "Operações legítimas do dono continuam funcionando."
+      ]
+    },
+    {
+      "id": "A04",
+      "severity": "alta",
+      "category": "3. IDOR",
+      "title": "Relatório clínico pode ser exportado para qualquer paciente",
+      "description": "GET /exportacoes/relatorio recebe id_usuario da query e repassa ao repository. A query filtra esse ID, mas nenhuma etapa verifica a identidade do solicitante ou o vínculo com o paciente. A validação de formato/data não é autorização.",
+      "impact": "Extração de identidade e histórico clínico consolidado em PDF/XLSX de terceiros, com observações e aplicações de insulina.",
+      "condition": "ID existente, intervalo válido e registros no período. Sem token/cookie necessário; download de PDF confirmado com banco simulado. Não foi acessado banco real.",
+      "evidence": [
+        {
+          "file": "src/routes/exportacaoRoutes.js",
+          "start": 6,
+          "end": 9,
+          "code": "6: router.get('/', exportacaoController.index)\n7: router.get('/relatorio', exportacaoController.gerarRelatorio)\n8: router.get('/:id', exportacaoController.show)\n9: router.post('/', exportacaoController.create)"
+        },
+        {
+          "file": "src/controllers/exportacaoController.js",
+          "start": 54,
+          "end": 60,
+          "code": "54:     const { id_usuario, dataInicio, dataFim, formato } = req.query\n55:     const arquivo = await exportacaoService.gerarRelatorio({\n56:       idUsuario: id_usuario,\n57:       dataInicio,\n58:       dataFim,\n59:       formato\n60:     })"
+        },
+        {
+          "file": "src/services/exportacaoService.js",
+          "start": 114,
+          "end": 118,
+          "code": "114:   const dados = await exportacaoRepository.findDadosRelatorio(\n115:     Number(idUsuario),\n116:     `${dataInicio} 00:00:00`,\n117:     dataFim\n118:   )"
+        },
+        {
+          "file": "src/repositories/exportacaoRepository.js",
+          "start": 84,
+          "end": 87,
+          "code": "84: async function findDadosRelatorio(idUsuario, dataInicio, dataFim) {\n85:   const [usuarios] = await db.execute(\n86:     'SELECT id_usuario, nome, email FROM usuario WHERE id_usuario = ?',\n87:     [idUsuario]"
+        },
+        {
+          "file": "src/repositories/exportacaoRepository.js",
+          "start": 104,
+          "end": 111,
+          "code": "104:     FROM registroglicose rg\n105:     LEFT JOIN periodo p ON p.id_periodo = rg.id_periodo\n106:     LEFT JOIN registroinsulina ri ON ri.id_registro = rg.id_registro\n107:     LEFT JOIN tipoinsulina ti ON ti.id_tipo_insulina = ri.id_tipo_insulina\n108:     WHERE rg.id_usuario = ? AND rg.data_hora >= ?\n109:       AND rg.data_hora < DATE_ADD(?, INTERVAL 1 DAY)\n110:     ORDER BY rg.data_hora ASC, ri.id_registro_insulina ASC`,\n111:     [idUsuario, dataInicio, dataFim]"
+        },
+        {
+          "file": "../insulog-mobile-front-clone/lib/services/api/report_export_service.dart",
+          "start": 58,
+          "end": 70,
+          "code": "58:       final uri = Uri.parse('${await _baseUrl()}/exportacoes/relatorio')\n59:           .replace(\n60:             queryParameters: {\n61:               'id_usuario': '$userId',\n62:               'dataInicio': firstDay,\n63:               'dataFim': lastDay,\n64:               'formato': format.name,\n65:             },\n66:           );\n67:       final get = _client?.get ?? http.get;\n68:       final response = await get(\n69:         uri,\n70:         headers: {'Accept': format.mimeType},"
+        }
+      ],
+      "fix": "Autenticar antes de gerar o relatório, usar o próprio ID da sessão ou validar explicitamente o vínculo com outro paciente. Reutilizar a mesma política para os dois formatos.",
+      "accept": [
+        "Sem sessão: 401 para PDF e XLSX.",
+        "Usuário A não exporta B alterando id_usuario.",
+        "Médico sem vínculo é rejeitado; vínculo autorizado é aceito.",
+        "Cache-Control no-store e validação dos parâmetros continuam presentes."
+      ]
+    },
+    {
+      "id": "A05",
+      "severity": "alta",
+      "category": "2. Permissões",
+      "title": "Catálogos compartilhados aceitam escrita anônima",
+      "description": "POST, PUT e DELETE de períodos e tipos de insulina não verificam privilégio. São catálogos globais sem dono individual; portanto a falha é de autorização funcional, e não IDOR de tenant. Não há gate de papel correspondente no frontend: os endpoints podem ser chamados diretamente.",
+      "impact": "Qualquer chamador pode inserir/alterar rótulos compartilhados usados nos registros e relatórios. Exclusões de entradas vinculadas podem ser bloqueadas por foreign keys; inserção e edição continuam sem autorização.",
+      "condition": "API acessível; campos descricao/nome preenchidos. PUT/DELETE exigem ID existente. Não foi presumido um papel admin que não existe no projeto.",
+      "evidence": [
+        {
+          "file": "src/routes/periodoRoutes.js",
+          "start": 8,
+          "end": 10,
+          "code": "8: router.post('/', periodoController.create)\n9: router.put('/:id', periodoController.update)\n10: router.delete('/:id', periodoController.deleteById)"
+        },
+        {
+          "file": "src/routes/typeInsuRoutes.js",
+          "start": 8,
+          "end": 10,
+          "code": "8: router.post('/', typeInsuController.create)\n9: router.put('/:id', typeInsuController.update)\n10: router.delete('/:id', typeInsuController.deleteById)"
+        },
+        {
+          "file": "src/services/periodoService.js",
+          "start": 40,
+          "end": 46,
+          "code": "40:   if (!data.descricao) {\n41:     const error = new Error('O campo descricao é obrigatório')\n42:     error.statusCode = 400\n43:     throw error\n44:   }\n45: \n46:   return await periodoRepository.update(id, { descricao: data.descricao })"
+        },
+        {
+          "file": "src/repositories/periodoRepository.js",
+          "start": 28,
+          "end": 30,
+          "code": "28:     const [result] = await conn.execute(\n29:       'INSERT INTO periodo (descricao) VALUES (?)',\n30:       [descricao]"
+        },
+        {
+          "file": "src/repositories/periodoRepository.js",
+          "start": 54,
+          "end": 56,
+          "code": "54:     await conn.execute(\n55:       'UPDATE periodo SET descricao = ? WHERE id_periodo = ?',\n56:       [descricao, id]"
+        },
+        {
+          "file": "src/repositories/periodoRepository.js",
+          "start": 73,
+          "end": 76,
+          "code": "73: async function deleteById(id) {\n74:   await db.execute(\n75:     'DELETE FROM periodo WHERE id_periodo = ?',\n76:     [id]"
+        },
+        {
+          "file": "src/repositories/typeInsuRepository.js",
+          "start": 21,
+          "end": 24,
+          "code": "21: async function deleteById(id) {\n22:   await db.execute(\n23:     'DELETE FROM tipoinsulina WHERE id_tipo_insulina = ?',\n24:     [id]"
+        },
+        {
+          "file": "src/repositories/typeInsuRepository.js",
+          "start": 36,
+          "end": 38,
+          "code": "36:     await conn.execute(\n37:       'UPDATE tipoinsulina SET nome = ? WHERE id_tipo_insulina = ?',\n38:       [nome, id]"
+        },
+        {
+          "file": "src/repositories/typeInsuRepository.js",
+          "start": 63,
+          "end": 65,
+          "code": "63:     const [result] = await conn.execute(\n64:       'INSERT INTO tipoinsulina (nome) VALUES (?)',\n65:       [nome]"
+        }
+      ],
+      "fix": "Definir política de manutenção dos catálogos e aplicá-la no servidor às seis operações de escrita. Se não forem gerenciáveis pela API, remover as rotas de mutação.",
+      "accept": [
+        "As seis operações rejeitam anônimo e usuário sem privilégio.",
+        "Somente principal explicitamente autorizado altera catálogos.",
+        "Testes cobrem POST, PUT e DELETE dos dois routers."
+      ]
+    },
+    {
+      "id": "A06",
+      "severity": "média",
+      "category": "2. Permissões",
+      "title": "Tipo de usuário é aceito do cliente sem aprovação",
+      "description": "O formulário cadastra paciente, mas o backend permite criar medico com qualquer CRM não vazio. PUT aceita tipo_usuario sem a lista de valores aplicada no cadastro. A manipulação do atributo é comprovada; nenhum privilégio médico adicional foi encontrado no código atual, portanto não se afirma escalada a administrador.",
+      "impact": "Falsificação do tipo de conta e da identidade profissional registrada; inconsistência de papéis. A tomada de conta pelo PUT é contada separadamente em A02.",
+      "condition": "POST exige e-mail ainda não cadastrado, campos obrigatórios e CRM não vazio para medico. PUT exige campos obrigatórios, mas não autorização. Um esquema de banco com restrição de domínio pode recusar valores fora da lista; medico continua permitido.",
+      "evidence": [
+        {
+          "file": "../insulog-mobile-front-clone/lib/services/api/auth_service.dart",
+          "start": 89,
+          "end": 95,
+          "code": "89:       await _apiService.post('usuarios', {\n90:         'nome': fullName,\n91:         'email': email,\n92:         'senha': password,\n93:         'tipo_login': 'email',\n94:         'tipo_usuario': 'paciente',\n95:         'id_medico': 16"
+        },
+        {
+          "file": "src/services/userService.js",
+          "start": 48,
+          "end": 58,
+          "code": "48:   const tipoNormalizado = tipo_usuario.toLowerCase()\n49: \n50:   if (!['medico', 'paciente'].includes(tipoNormalizado)) {\n51:     const error = new Error('tipo_usuario invalido')\n52:     error.statusCode = 400\n53:     throw error\n54:   }\n55: \n56:   if (tipoNormalizado === 'medico' && !crm) {\n57:     const error = new Error('crm e obrigatorio para usuarios do tipo medico')\n58:     error.statusCode = 400"
+        },
+        {
+          "file": "src/services/userService.js",
+          "start": 70,
+          "end": 74,
+          "code": "70:   const senhaCriptografada = passwordService.hashPassword(senha)\n71: \n72:   return await userRepository.create(\n73:     { nome, email, senha: senhaCriptografada, tipo_login, tipo_usuario, id_medico, crm },\n74:     tipoNormalizado"
+        },
+        {
+          "file": "src/services/userService.js",
+          "start": 78,
+          "end": 91,
+          "code": "78: async function updateUser(id, data) {\n79:   const { nome, email, senha, tipo_login, tipo_usuario, id_medico, crm } = data\n80: \n81:   if (!nome || !email || !senha || !tipo_login || !tipo_usuario) {\n82:     const error = new Error('Todos os campos sao obrigatorios')\n83:     error.statusCode = 400\n84:     throw error\n85:   }\n86: \n87:   const senhaCriptografada = passwordService.hashPassword(senha)\n88: \n89:   return await userRepository.update(\n90:     id,\n91:     { nome, email, senha: senhaCriptografada, tipo_login, tipo_usuario, id_medico, crm }"
+        },
+        {
+          "file": "src/repositories/userRepository.js",
+          "start": 97,
+          "end": 100,
+          "code": "97:     if (tipoNormalizado === 'medico') {\n98:       await conn.execute(\n99:         `INSERT INTO medico (id_usuario, crm) VALUES (?, ?)`,\n100:         [idUsuario, crm]"
+        },
+        {
+          "file": "src/repositories/userRepository.js",
+          "start": 134,
+          "end": 136,
+          "code": "134:     await conn.execute(\n135:       'UPDATE usuario SET nome = ?, email = ?, senha = ?, tipo_login = ?, tipo_usuario = ? WHERE id_usuario = ?',\n136:       [nome, email, senha, tipo_login, tipo_usuario, id]"
+        }
+      ],
+      "fix": "Fixar o tipo permitido no cadastro público e criar processo autorizado de validação/aprovação para profissional, conforme regra do produto. Remover tipo_usuario do DTO de autoedição e validar domínio de valores no backend.",
+      "accept": [
+        "Cadastro público não atribui papel profissional sem o processo definido.",
+        "Autoedição não altera tipo_usuario.",
+        "Tipo inválido é rejeitado no servidor.",
+        "Testes documentam a política de cadastro de profissionais."
+      ]
+    },
+    {
+      "id": "A07",
+      "severity": "alta",
+      "category": "4. Chaves expostas",
+      "title": "Credenciais MySQL permanecem recuperáveis no Git",
+      "description": "O arquivo .env foi versionado com DB_USER=root e DB_PASSWORD em texto claro. Foram identificados dois valores distintos em blobs históricos, apesar de o arquivo não existir no HEAD. O commit inicial já continha uma credencial; uma revisão posterior contém a segunda. Valores foram ocultados neste relatório para evitar nova distribuição.",
+      "impact": "Leitores do histórico obtêm credenciais de banco. Se ainda válidas ou reutilizadas em serviço alcançável, permitem acesso com os privilégios configurados para essa conta. Não foram testadas contra nenhum serviço.",
+      "condition": "Exposição histórica confirmada; uso atual, validade e alcance de rede não aferidos. DB_HOST era localhost, o que limita acesso direto remoto e não elimina risco de reutilização ou acesso ao host. Severidade alta condicionada à credencial ainda utilizável.",
+      "evidence": [
+        {
+          "file": ".env",
+          "start": 1,
+          "end": 5,
+          "revision": "147015e9442db41485dc3365a63c6265aa55147a",
+          "code": "1: DB_HOST=localhost\n2: DB_PORT=3306\n3: DB_USER=root\n4: DB_PASSWORD=[VALOR OCULTADO]\n5: DB_NAME=insulog"
+        },
+        {
+          "file": ".env",
+          "start": 1,
+          "end": 5,
+          "revision": "9ec3cabca65b06920694611234d5a4c05a49b90a",
+          "code": "1: DB_HOST=localhost\n2: DB_PORT=3306\n3: DB_USER=root\n4: DB_PASSWORD=[VALOR OCULTADO]\n5: DB_NAME=insulog"
+        },
+        {
+          "file": "src/config/database.js",
+          "start": 8,
+          "end": 13,
+          "code": "8: const pool = mysql.createPool({\n9:   host: process.env.DB_HOST,\n10:   port: Number(process.env.DB_PORT),\n11:   user: process.env.DB_USER,\n12:   password: process.env.DB_PASSWORD,\n13:   database: process.env.DB_NAME,"
+        },
+        {
+          "file": ".gitignore",
+          "start": 1,
+          "end": 5,
+          "code": "1: node_modules/\n2: .env\n3: .env.local\n4: .env.development\n5: .env.production"
+        }
+      ],
+      "fix": "Rotacionar as duas credenciais expostas e qualquer reutilização; adotar conta de aplicação com privilégio mínimo. Só depois tratar histórico e cópias sob controle da equipe, com coordenação dos clones. Manter segredos fora do Git e adicionar detector no CI.",
+      "accept": [
+        "As duas credenciais antigas foram invalidadas, com confirmação do responsável pelo banco.",
+        "Aplicação usa segredo externo e conta com privilégio mínimo.",
+        "Varredura de segredos cobre commits no CI.",
+        "Plano de tratamento do histórico/cópias foi executado ou documentado; remoção de HEAD não é aceita como rotação."
+      ]
+    },
+    {
+      "id": "A08",
+      "severity": "alta",
+      "category": "Adicional",
+      "title": "Senhas e respostas sensíveis são gravadas nos logs",
+      "description": "O middleware registra req.body integralmente antes dos handlers, incluindo password do login e senha do cadastro/edição. Cadastro duplica o log no controller e no serviço. O interceptor também registra respostas completas, incluindo hashes da listagem e dados clínicos.",
+      "impact": "Operadores ou terceiros com acesso aos logs obtêm senhas utilizáveis e dados pessoais/clínicos. A reprodução com valores fictícios confirmou senha e hash nos logs.",
+      "condition": "Requer requisição com dados sensíveis e acesso posterior à saída de logs; não depende de modo debug ou feature flag. Não foi verificada a retenção ou ACL de um provedor de logs.",
+      "evidence": [
+        {
+          "file": "src/app.js",
+          "start": 39,
+          "end": 48,
+          "code": "39:     const retorno = Buffer.isBuffer(body)\n40:       ? body.toString('utf8')\n41:       : body\n42: \n43:     console.log('<retorno>', {\n44:       metodo: req.method,\n45:       rota: req.originalUrl,\n46:       status: res.statusCode,\n47:       body: retorno\n48:     })"
+        },
+        {
+          "file": "src/app.js",
+          "start": 51,
+          "end": 58,
+          "code": "51:   res.json = function jsonInterceptado(body) {\n52:     registrarRetorno(body)\n53:     return originalJson(body)\n54:   }\n55: \n56:   res.send = function sendInterceptado(body) {\n57:     registrarRetorno(body)\n58:     return originalSend(body)"
+        },
+        {
+          "file": "src/app.js",
+          "start": 78,
+          "end": 85,
+          "code": "78: app.use((req, res, next) => {\n79:   if (Object.keys(req.query).length > 0) {\n80:     console.log('Query:', req.query)\n81:   }\n82: \n83:   if (req.body && Object.keys(req.body).length > 0) {\n84:     console.log('Body:', req.body)\n85:   }"
+        },
+        {
+          "file": "src/controllers/userController.js",
+          "start": 43,
+          "end": 46,
+          "code": "43: async function create(req, res, next) {\n44:   try {\n45:     console.log('Request body:', req.body)\n46:     const user = await userService.createUser(req.body)"
+        },
+        {
+          "file": "src/services/userService.js",
+          "start": 37,
+          "end": 40,
+          "code": "37: async function createUser(data) {\n38:   const { nome, email, senha, tipo_login, tipo_usuario, id_medico, crm } = data\n39: \n40:   console.log('createUser:', data)"
+        }
+      ],
+      "fix": "Substituir dumps de body/resposta por metadados permitidos e redigir campos sensíveis recursivamente quando necessário. Retirar logs duplicados e tratar acesso/retencão dos logs existentes; avaliar troca das senhas expostas.",
+      "accept": [
+        "Login, cadastro e edição não deixam senha/password/hash nos logs.",
+        "Respostas clínicas não são registradas integralmente.",
+        "Testes capturam saída de log e validam ausência de valores sentinela.",
+        "Logs preexistentes têm acesso e retenção revisados."
+      ]
+    },
+    {
+      "id": "A09",
+      "severity": "média",
+      "category": "Adicional",
+      "title": "App persiste senha em preferências locais",
+      "description": "Após login bem-sucedido, o app grava a senha original em SharedPreferences e a recupera para novo login automático. O código não utiliza armazenamento protegido para esse valor. O bundle local também contém a gravação da chave saved_password, sem uma senha literal embutida.",
+      "impact": "Quem obtiver acesso ao armazenamento da aplicação pode recuperar a senha reutilizável. No artefato web, as preferências usam armazenamento do navegador; não foi demonstrado um XSS para acessá-lo.",
+      "condition": "Login bem-sucedido e acesso ao armazenamento local, perfil do navegador ou contexto comprometido. Não se afirma que um outro app Android sem privilégios possa ler o sandbox.",
+      "evidence": [
+        {
+          "file": "../insulog-mobile-front-clone/lib/services/local/saved_login_service.dart",
+          "start": 20,
+          "end": 28,
+          "code": "20:   Future<void> saveCredentials({\n21:     required int userId,\n22:     required String username,\n23:     required String password,\n24:   }) async {\n25:     final prefs = await SharedPreferences.getInstance();\n26:     await prefs.setInt(_userIdKey, userId);\n27:     await prefs.setString(_usernameKey, username);\n28:     await prefs.setString(_passwordKey, password);"
+        },
+        {
+          "file": "../insulog-mobile-front-clone/lib/services/local/saved_login_service.dart",
+          "start": 31,
+          "end": 35,
+          "code": "31:   Future<SavedLoginData?> getCredentials() async {\n32:     final prefs = await SharedPreferences.getInstance();\n33:     final userId = prefs.getInt(_userIdKey);\n34:     final username = prefs.getString(_usernameKey);\n35:     final password = prefs.getString(_passwordKey);"
+        },
+        {
+          "file": "../insulog-mobile-front-clone/lib/states/login_form_state.dart",
+          "start": 54,
+          "end": 59,
+          "code": "54:       final loginData = await AuthService().login(username, password);\n55:       await _savedLoginService.saveCredentials(\n56:         userId: loginData.userId,\n57:         username: username,\n58:         password: password,\n59:       );"
+        },
+        {
+          "file": "../insulog-mobile-front-clone/lib/states/login_form_state.dart",
+          "start": 111,
+          "end": 115,
+          "code": "111:     try {\n112:       final loginData = await AuthService().login(\n113:         savedCredentials.username,\n114:         savedCredentials.password,\n115:       );"
+        }
+      ],
+      "fix": "Eliminar persistência de senha. Usar sessão revogável/expirável, com armazenamento apropriado à plataforma: Keychain/Keystore no app nativo e cookie HttpOnly/Secure quando a arquitetura web permitir. Limpar a chave antiga na migração.",
+      "accept": [
+        "Não existe senha original nas preferências após login.",
+        "A migração remove saved_password de instalações existentes.",
+        "Logout/revogação invalidam a sessão e limpam o armazenamento.",
+        "Autologin funciona com credencial de sessão revogável, sem guardar senha."
+      ]
+    },
+    {
+      "id": "A10",
+      "severity": "alta",
+      "category": "Adicional",
+      "title": "App envia login e dados clínicos por HTTP",
+      "description": "A URL base é construída exclusivamente com http://, e o manifesto Android principal permite tráfego sem TLS. A senha é enviada em JSON para /login por essa mesma URL. O relatório também usa a URL base sem HTTPS.",
+      "impact": "Observador ou intermediário no caminho de rede pode ler credenciais e dados clínicos; um intermediário ativo pode alterar respostas. Isto independe de CORS e do hash da senha no banco.",
+      "condition": "Atacante com visibilidade/controle do caminho de rede e uso da URL HTTP produzida pelo app. Um túnel externo pode mitigar o transporte, mas não foi encontrado no escopo. Não houve interceptação de tráfego real.",
+      "evidence": [
+        {
+          "file": "../insulog-mobile-front-clone/lib/services/local/api_ip_service.dart",
+          "start": 18,
+          "end": 26,
+          "code": "18:   Future<String> getBaseUrl() async {\n19:     final savedIp = await getApiIpDigits();\n20:     final ip =\n21:         (isValidIp(savedIp) ? savedIp : null) ??\n22:         formatDigitsAsIp(savedIp) ??\n23:         formatDigitsAsIp(_defaultApiIpDigits) ??\n24:         '10.173.57.47';\n25: \n26:     return 'http://$ip:$_apiPort';"
+        },
+        {
+          "file": "../insulog-mobile-front-clone/lib/services/api/auth_service.dart",
+          "start": 12,
+          "end": 17,
+          "code": "12:   Future<LoginData> login(String username, String password) async {\n13:     try {\n14:       final response = await _apiService.post('login', {\n15:         'username': username,\n16:         'password': password,\n17:       });"
+        },
+        {
+          "file": "../insulog-mobile-front-clone/lib/services/api/api_service.dart",
+          "start": 28,
+          "end": 32,
+          "code": "28:       _logRequest('POST', uri, body: body);\n29: \n30:       final response = await http\n31:           .post(uri, headers: headers, body: jsonEncode(body))\n32:           .timeout(const Duration(seconds: 10));"
+        },
+        {
+          "file": "../insulog-mobile-front-clone/android/app/src/main/AndroidManifest.xml",
+          "start": 10,
+          "end": 15,
+          "code": "10:     <application\n11:         android:label=\"insulog\"\n12:         android:name=\"${applicationName}\"\n13:         android:icon=\"@mipmap/ic_launcher\"\n14:         android:enableOnBackInvokedCallback=\"true\"\n15:         android:usesCleartextTraffic=\"true\">"
+        },
+        {
+          "file": "../insulog-mobile-front-clone/lib/services/api/report_export_service.dart",
+          "start": 58,
+          "end": 70,
+          "code": "58:       final uri = Uri.parse('${await _baseUrl()}/exportacoes/relatorio')\n59:           .replace(\n60:             queryParameters: {\n61:               'id_usuario': '$userId',\n62:               'dataInicio': firstDay,\n63:               'dataFim': lastDay,\n64:               'formato': format.name,\n65:             },\n66:           );\n67:       final get = _client?.get ?? http.get;\n68:       final response = await get(\n69:         uri,\n70:         headers: {'Accept': format.mimeType},"
+        }
+      ],
+      "fix": "Disponibilizar API com HTTPS e certificado válido, permitir URL segura no cliente e bloquear tráfego HTTP nas configurações de produção. Se HTTP for necessário no desenvolvimento, restringi-lo a configuração específica de debug.",
+      "accept": [
+        "Build de produção só envia credenciais e registros por HTTPS.",
+        "HTTP e certificado inválido são rejeitados em produção.",
+        "Manifesto de release não permite tráfego em claro.",
+        "Download PDF/XLSX usa a mesma política TLS."
+      ]
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Hash de senha nas novas gravações",
+      "text": "Cadastro e atualização geram scrypt com salt aleatório de 16 bytes; comparação de hashes usa timingSafeEqual. Ressalva: permanece fallback para senhas legadas em texto puro e A01 expõe a coluna senha.",
+      "refs": [
+        "src/services/passwordService.js:6-9,27-34,42-47",
+        "src/services/userService.js:70-74,87-91"
+      ]
+    },
+    {
+      "title": "SQL parametrizado nos valores",
+      "text": "Os oito repositories usam execute e placeholders para IDs e valores. LIMIT é numérico validado nos serviços; direção de ORDER BY é escolhida em lista fixa. Isso reduz injeção SQL, mas não prova autorização.",
+      "refs": [
+        "src/repositories/userRepository.js:42-66",
+        "src/services/registroGlicoseService.js:22-35",
+        "src/services/registroInsulinaService.js:20-33",
+        "src/repositories/registroGlicoseRepository.js:301-310"
+      ]
+    },
+    {
+      "title": "Saída sem interpretação de HTML nos caminhos revisados",
+      "text": "Flutter usa Text/TextSpan; PDFKit usa doc.text para observações; ExcelJS recebe strings. Não há e-mail/template HTML, WebView, interpretador Markdown/HTML ou eval alimentado por usuário no código próprio revisado. O SVG do PDF é asset local fixo.",
+      "refs": [
+        "../insulog-mobile-front-clone/lib/widgets/home/home_header_widget.dart:24-25",
+        "src/reports/pdfReport.js:6-7,54-60,314-318",
+        "src/reports/xlsxReport.js:54-63"
+      ]
+    },
+    {
+      "title": "Validação e cabeçalhos na exportação",
+      "text": "ID inteiro seguro, datas reais e ordenadas, formatos limitados; no-store, attachment e nosniff. O cliente verifica MIME/assinatura e restringe nome de arquivo. São proteções válidas, porém não substituem a posse ausente em A04.",
+      "refs": [
+        "src/services/exportacaoService.js:74-112",
+        "src/controllers/exportacaoController.js:51-67",
+        "../insulog-mobile-front-clone/lib/services/api/report_export_service.dart:86-115"
+      ]
+    },
+    {
+      "title": "Credenciais externas no HEAD e CI restrito da API",
+      "text": "Configuração MySQL atual usa apenas variáveis de ambiente, sem senha pública de fallback. Workflow da API declara contents: read. Ausência de segredo no HEAD não elimina o achado histórico A07.",
+      "refs": [
+        "src/config/database.js:8-13",
+        ".github/workflows/api-tests.yml:11-12"
+      ]
+    },
+    {
+      "title": "Redação de credenciais no logger do cliente",
+      "text": "O cliente mascara recursivamente campos com senha/password/token. É um controle parcial de logs, não sanitização de HTML; as respostas clínicas ainda são logadas pelo cliente e o backend não aplica essa proteção.",
+      "refs": [
+        "../insulog-mobile-front-clone/lib/services/api/api_service.dart:244-254,274-291"
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "name": "1. Isolamento",
+      "mapping": "MySQL com SQL manual e filtros id_usuario; sem RLS, middleware de tenant ou identidade autenticada no código. Não há entidade organização/workspace. Relação paciente.id_medico existe, mas não é usada para autorizar consultas.",
+      "result": "A01: listagens sem filtro. Filtros existentes aceitam ID do cliente; IDs específicos agrupados na categoria 3 para não contar duas vezes."
+    },
+    {
+      "name": "2. Permissões",
+      "mapping": "Flutter/Dart, não navegador como fronteira de confiança. Busca de gates isAdmin/canEdit/role/tipo_usuario e rastreio de APIs.",
+      "result": "Nenhum gate visual por papel encontrado para cruzar 1:1. Cadastro fixa paciente no cliente; servidor aceita medico (A06). Escrita dos catálogos está aberta (A05). Não há privilégio admin implementado demonstrado."
+    },
+    {
+      "name": "3. IDOR",
+      "mapping": "Todos os 49 registros de rota Express foram rastreados por controller, serviço e repository; 48 são alcançáveis.",
+      "result": "A02/A03/A04. GET /usuarios/:tipo_usuario é sombreado por /:id; não foi tratado como endpoint explorável separado. Catálogos são globais; suas escritas pertencem à categoria 2."
+    },
+    {
+      "name": "4. Chaves expostas",
+      "mapping": "Código/config/CI/documentação, defaults, todas as refs Git locais e artefatos locais do frontend.",
+      "result": "A07: duas credenciais históricas. HEAD usa process.env, sem defaults secretos. Startup não valida configuração e captura falha de conexão, mas não há default secreto comprovado; isso não foi contado como outro achado. Não há Docker/Compose/Helm/Terraform próprios nos arquivos versionados."
+    },
+    {
+      "name": "5. XSS",
+      "mapping": "Flutter Text/TextSpan, assets SVG locais e bootstrap web; Express JSON, PDFKit e ExcelJS. Busca de sinks HTML, URLs, eval, Markdown e templates.",
+      "result": "Nenhum fluxo XSS verificado. Sinks de HTML/e-mail não se aplicam aos caminhos implementados. Não há biblioteca dedicada a sanitizar HTML nas dependências diretas; sua ausência não é vulnerabilidade onde HTML não é interpretado."
+    },
+    {
+      "name": "Adicional",
+      "mapping": "Achados diretamente observados de proteção de credenciais, fora das cinco categorias.",
+      "result": "A08: logs; A09: persistência local; A10: transporte HTTP. Não são classificados como hardcode nem XSS."
+    }
+  ],
+  "coverage": [
+    {
+      "method": "GET",
+      "route": "/",
+      "route_file": "src/app.js:90",
+      "controller": "inline:90-94",
+      "service": "—",
+      "repository": "—",
+      "result": "Público intencional; mensagem de saúde da API; sem dados de usuário."
+    },
+    {
+      "method": "GET",
+      "route": "/alarmes",
+      "route_file": "src/routes/alarmeRoutes.js:6",
+      "controller": "src/controllers/alarmeController.js:3 (index)",
+      "service": "src/services/alarmeService.js:32 (listAlarmes)",
+      "repository": "src/repositories/alarmeRepository.js:14 (findAll)",
+      "result": "Sem autenticação e sem autorização/posse; listagem global A01."
+    },
+    {
+      "method": "GET",
+      "route": "/alarmes/usuario/:usuarioId",
+      "route_file": "src/routes/alarmeRoutes.js:7",
+      "controller": "src/controllers/alarmeController.js:12 (showByUsuarioId)",
+      "service": "src/services/alarmeService.js:36 (getAlarmesByUsuarioId)",
+      "repository": "src/repositories/alarmeRepository.js:22 (findByUsuarioId)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/alarmes/:id",
+      "route_file": "src/routes/alarmeRoutes.js:8",
+      "controller": "src/controllers/alarmeController.js:22 (show)",
+      "service": "src/services/alarmeService.js:48 (getAlarmeById)",
+      "repository": "src/repositories/alarmeRepository.js:30 (findById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "POST",
+      "route": "/alarmes",
+      "route_file": "src/routes/alarmeRoutes.js:9",
+      "controller": "src/controllers/alarmeController.js:32 (create)",
+      "service": "src/services/alarmeService.js:60 (createAlarme)",
+      "repository": "src/repositories/alarmeRepository.js:39 (create)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "PUT",
+      "route": "/alarmes/:id",
+      "route_file": "src/routes/alarmeRoutes.js:10",
+      "controller": "src/controllers/alarmeController.js:41 (update)",
+      "service": "src/services/alarmeService.js:81 (updateAlarme)",
+      "repository": "src/repositories/alarmeRepository.js:30 (findById); src/repositories/alarmeRepository.js:72 (update)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "DELETE",
+      "route": "/alarmes/:id",
+      "route_file": "src/routes/alarmeRoutes.js:11",
+      "controller": "src/controllers/alarmeController.js:51 (deleteById)",
+      "service": "src/services/alarmeService.js:110 (deleteById)",
+      "repository": "src/repositories/alarmeRepository.js:105 (deleteById); src/repositories/alarmeRepository.js:30 (findById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "POST",
+      "route": "/login",
+      "route_file": "src/routes/authRoutes.js:6",
+      "controller": "src/controllers/authController.js:3 (login)",
+      "service": "src/services/authService.js:4 (login)",
+      "repository": "src/repositories/userRepository.js:60 (findByLogin)",
+      "result": "Público intencional; verifica senha; não emite token/sessão."
+    },
+    {
+      "method": "GET",
+      "route": "/configuracoes",
+      "route_file": "src/routes/configuracaoRoutes.js:6",
+      "controller": "src/controllers/configuracaoController.js:3 (index)",
+      "service": "src/services/configuracaoService.js:3 (listConfiguracoes)",
+      "repository": "src/repositories/configuracaoRepository.js:4 (findAll)",
+      "result": "Sem autenticação e sem autorização/posse; listagem global A01."
+    },
+    {
+      "method": "GET",
+      "route": "/configuracoes/:id",
+      "route_file": "src/routes/configuracaoRoutes.js:7",
+      "controller": "src/controllers/configuracaoController.js:12 (show)",
+      "service": "src/services/configuracaoService.js:7 (getConfiguracaoById)",
+      "repository": "src/repositories/configuracaoRepository.js:12 (findById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "POST",
+      "route": "/configuracoes",
+      "route_file": "src/routes/configuracaoRoutes.js:8",
+      "controller": "src/controllers/configuracaoController.js:22 (create)",
+      "service": "src/services/configuracaoService.js:19 (createConfiguracao)",
+      "repository": "src/repositories/configuracaoRepository.js:21 (create)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "PUT",
+      "route": "/configuracoes/:id",
+      "route_file": "src/routes/configuracaoRoutes.js:9",
+      "controller": "src/controllers/configuracaoController.js:31 (update)",
+      "service": "src/services/configuracaoService.js:36 (updateConfiguracao)",
+      "repository": "src/repositories/configuracaoRepository.js:12 (findById); src/repositories/configuracaoRepository.js:50 (update)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "DELETE",
+      "route": "/configuracoes/:id",
+      "route_file": "src/routes/configuracaoRoutes.js:10",
+      "controller": "src/controllers/configuracaoController.js:41 (deleteById)",
+      "service": "src/services/configuracaoService.js:61 (deleteById)",
+      "repository": "src/repositories/configuracaoRepository.js:12 (findById); src/repositories/configuracaoRepository.js:79 (deleteById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/exportacoes",
+      "route_file": "src/routes/exportacaoRoutes.js:6",
+      "controller": "src/controllers/exportacaoController.js:3 (index)",
+      "service": "src/services/exportacaoService.js:6 (listExportacoes)",
+      "repository": "src/repositories/exportacaoRepository.js:4 (findAll)",
+      "result": "Sem autenticação e sem autorização/posse; listagem global A01."
+    },
+    {
+      "method": "GET",
+      "route": "/exportacoes/relatorio",
+      "route_file": "src/routes/exportacaoRoutes.js:7",
+      "controller": "src/controllers/exportacaoController.js:51 (gerarRelatorio)",
+      "service": "src/services/exportacaoService.js:85 (gerarRelatorio)",
+      "repository": "src/repositories/exportacaoRepository.js:84 (findDadosRelatorio)",
+      "result": "Sem autenticação e sem autorização/posse; ID da query controla exportação A04."
+    },
+    {
+      "method": "GET",
+      "route": "/exportacoes/:id",
+      "route_file": "src/routes/exportacaoRoutes.js:8",
+      "controller": "src/controllers/exportacaoController.js:12 (show)",
+      "service": "src/services/exportacaoService.js:10 (getExportacaoById)",
+      "repository": "src/repositories/exportacaoRepository.js:12 (findById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "POST",
+      "route": "/exportacoes",
+      "route_file": "src/routes/exportacaoRoutes.js:9",
+      "controller": "src/controllers/exportacaoController.js:22 (create)",
+      "service": "src/services/exportacaoService.js:22 (createExportacao)",
+      "repository": "src/repositories/exportacaoRepository.js:21 (create)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "PUT",
+      "route": "/exportacoes/:id",
+      "route_file": "src/routes/exportacaoRoutes.js:10",
+      "controller": "src/controllers/exportacaoController.js:31 (update)",
+      "service": "src/services/exportacaoService.js:38 (updateExportacao)",
+      "repository": "src/repositories/exportacaoRepository.js:12 (findById); src/repositories/exportacaoRepository.js:49 (update)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "DELETE",
+      "route": "/exportacoes/:id",
+      "route_file": "src/routes/exportacaoRoutes.js:11",
+      "controller": "src/controllers/exportacaoController.js:41 (deleteById)",
+      "service": "src/services/exportacaoService.js:62 (deleteById)",
+      "repository": "src/repositories/exportacaoRepository.js:12 (findById); src/repositories/exportacaoRepository.js:77 (deleteById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/periodos",
+      "route_file": "src/routes/periodoRoutes.js:6",
+      "controller": "src/controllers/periodoController.js:3 (index)",
+      "service": "src/services/periodoService.js:3 (listPeriodos)",
+      "repository": "src/repositories/periodoRepository.js:4 (findAll)",
+      "result": "Leitura de catálogo global; sem dado privado identificado."
+    },
+    {
+      "method": "GET",
+      "route": "/periodos/:id",
+      "route_file": "src/routes/periodoRoutes.js:7",
+      "controller": "src/controllers/periodoController.js:12 (show)",
+      "service": "src/services/periodoService.js:7 (getPeriodoById)",
+      "repository": "src/repositories/periodoRepository.js:12 (findById)",
+      "result": "Leitura de catálogo global; sem dado privado identificado."
+    },
+    {
+      "method": "POST",
+      "route": "/periodos",
+      "route_file": "src/routes/periodoRoutes.js:8",
+      "controller": "src/controllers/periodoController.js:22 (create)",
+      "service": "src/services/periodoService.js:19 (createPeriodo)",
+      "repository": "src/repositories/periodoRepository.js:21 (create)",
+      "result": "Sem autenticação e sem autorização/posse; A05."
+    },
+    {
+      "method": "PUT",
+      "route": "/periodos/:id",
+      "route_file": "src/routes/periodoRoutes.js:9",
+      "controller": "src/controllers/periodoController.js:31 (update)",
+      "service": "src/services/periodoService.js:31 (updatePeriodo)",
+      "repository": "src/repositories/periodoRepository.js:12 (findById); src/repositories/periodoRepository.js:47 (update)",
+      "result": "Sem autenticação e sem autorização/posse; A05."
+    },
+    {
+      "method": "DELETE",
+      "route": "/periodos/:id",
+      "route_file": "src/routes/periodoRoutes.js:10",
+      "controller": "src/controllers/periodoController.js:41 (deleteById)",
+      "service": "src/services/periodoService.js:49 (deleteById)",
+      "repository": "src/repositories/periodoRepository.js:12 (findById); src/repositories/periodoRepository.js:73 (deleteById)",
+      "result": "Sem autenticação e sem autorização/posse; A05."
+    },
+    {
+      "method": "GET",
+      "route": "/registros-glicose",
+      "route_file": "src/routes/registroGlicoseRoutes.js:6",
+      "controller": "src/controllers/registroGlicoseController.js:3 (index)",
+      "service": "src/services/registroGlicoseService.js:6 (listRegistrosGlicose)",
+      "repository": "src/repositories/registroGlicoseRepository.js:4 (findAll)",
+      "result": "Sem autenticação e sem autorização/posse; listagem global A01."
+    },
+    {
+      "method": "GET",
+      "route": "/registros-glicose/dashboard",
+      "route_file": "src/routes/registroGlicoseRoutes.js:7",
+      "controller": "src/controllers/registroGlicoseController.js:44 (getDashboard)",
+      "service": "src/services/registroGlicoseService.js:207 (getDashboardDados)",
+      "repository": "src/repositories/registroGlicoseRepository.js:301 (findByUserIdAndPeriod)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/registros-glicose/usuario/:id_usuario/historico",
+      "route_file": "src/routes/registroGlicoseRoutes.js:8",
+      "controller": "src/controllers/registroGlicoseController.js:54 (getHistorico)",
+      "service": "src/services/registroGlicoseService.js:271 (getHistorico)",
+      "repository": "src/repositories/registroGlicoseRepository.js:301 (findByUserIdAndPeriod)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/registros-glicose/usuario/:id_usuario",
+      "route_file": "src/routes/registroGlicoseRoutes.js:9",
+      "controller": "src/controllers/registroGlicoseController.js:12 (showByUserId)",
+      "service": "src/services/registroGlicoseService.js:38 (getRegistrosGlicoseByUserId); src/services/registroGlicoseService.js:207 (getDashboardDados); src/services/registroGlicoseService.js:38 (getRegistrosGlicoseByUserId)",
+      "repository": "src/repositories/registroGlicoseRepository.js:301 (findByUserIdAndPeriod); src/repositories/registroGlicoseRepository.js:66 (findByUserId); src/repositories/userRepository.js:60 (findByLogin)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/registros-glicose/:id",
+      "route_file": "src/routes/registroGlicoseRoutes.js:10",
+      "controller": "src/controllers/registroGlicoseController.js:34 (show)",
+      "service": "src/services/registroGlicoseService.js:10 (getRegistroGlicoseById)",
+      "repository": "src/repositories/registroGlicoseRepository.js:27 (findDetalhadoById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "POST",
+      "route": "/registros-glicose",
+      "route_file": "src/routes/registroGlicoseRoutes.js:11",
+      "controller": "src/controllers/registroGlicoseController.js:70 (create)",
+      "service": "src/services/registroGlicoseService.js:337 (createRegistroGlicose)",
+      "repository": "src/repositories/registroGlicoseRepository.js:143 (createCompleto); src/repositories/registroGlicoseRepository.js:27 (findDetalhadoById); src/repositories/registroGlicoseRepository.js:81 (create)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "PUT",
+      "route": "/registros-glicose/:id",
+      "route_file": "src/routes/registroGlicoseRoutes.js:12",
+      "controller": "src/controllers/registroGlicoseController.js:79 (update)",
+      "service": "src/services/registroGlicoseService.js:356 (updateRegistroGlicose)",
+      "repository": "src/repositories/registroGlicoseRepository.js:15 (findById); src/repositories/registroGlicoseRepository.js:189 (updateCompleto)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "DELETE",
+      "route": "/registros-glicose/:id",
+      "route_file": "src/routes/registroGlicoseRoutes.js:13",
+      "controller": "src/controllers/registroGlicoseController.js:89 (deleteById)",
+      "service": "src/services/registroGlicoseService.js:378 (deleteById)",
+      "repository": "src/repositories/registroGlicoseRepository.js:15 (findById); src/repositories/registroGlicoseRepository.js:271 (deleteById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/registros-insulina",
+      "route_file": "src/routes/registroInsulinaRoutes.js:6",
+      "controller": "src/controllers/registroInsulinaController.js:3 (index)",
+      "service": "src/services/registroInsulinaService.js:4 (listRegistrosInsulina)",
+      "repository": "src/repositories/registroInsulinaRepository.js:4 (findAll)",
+      "result": "Sem autenticação e sem autorização/posse; listagem global A01."
+    },
+    {
+      "method": "GET",
+      "route": "/registros-insulina/usuario/:id_usuario",
+      "route_file": "src/routes/registroInsulinaRoutes.js:7",
+      "controller": "src/controllers/registroInsulinaController.js:22 (showByUserId)",
+      "service": "src/services/registroInsulinaService.js:36 (getRegistrosInsulinaByUserId)",
+      "repository": "src/repositories/registroInsulinaRepository.js:21 (findByUserId); src/repositories/userRepository.js:60 (findByLogin)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/registros-insulina/:id",
+      "route_file": "src/routes/registroInsulinaRoutes.js:8",
+      "controller": "src/controllers/registroInsulinaController.js:12 (show)",
+      "service": "src/services/registroInsulinaService.js:8 (getRegistroInsulinaById)",
+      "repository": "src/repositories/registroInsulinaRepository.js:12 (findById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "POST",
+      "route": "/registros-insulina",
+      "route_file": "src/routes/registroInsulinaRoutes.js:9",
+      "controller": "src/controllers/registroInsulinaController.js:33 (create)",
+      "service": "src/services/registroInsulinaService.js:71 (createRegistroInsulina)",
+      "repository": "src/repositories/registroInsulinaRepository.js:44 (create)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "PUT",
+      "route": "/registros-insulina/:id",
+      "route_file": "src/routes/registroInsulinaRoutes.js:10",
+      "controller": "src/controllers/registroInsulinaController.js:42 (update)",
+      "service": "src/services/registroInsulinaService.js:87 (updateRegistroInsulina)",
+      "repository": "src/repositories/registroInsulinaRepository.js:12 (findById); src/repositories/registroInsulinaRepository.js:72 (update)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "DELETE",
+      "route": "/registros-insulina/:id",
+      "route_file": "src/routes/registroInsulinaRoutes.js:11",
+      "controller": "src/controllers/registroInsulinaController.js:52 (deleteById)",
+      "service": "src/services/registroInsulinaService.js:111 (deleteById)",
+      "repository": "src/repositories/registroInsulinaRepository.js:100 (deleteById); src/repositories/registroInsulinaRepository.js:12 (findById)",
+      "result": "Sem autenticação e sem autorização/posse; ID do path/query/body controla dados A03."
+    },
+    {
+      "method": "GET",
+      "route": "/tipos-insulina",
+      "route_file": "src/routes/typeInsuRoutes.js:6",
+      "controller": "src/controllers/typeInsuController.js:3 (index)",
+      "service": "src/services/typeInsuService.js:3 (listTypeInsu)",
+      "repository": "src/repositories/typeInsuRepository.js:4 (findAll)",
+      "result": "Leitura de catálogo global; sem dado privado identificado."
+    },
+    {
+      "method": "GET",
+      "route": "/tipos-insulina/:id",
+      "route_file": "src/routes/typeInsuRoutes.js:7",
+      "controller": "src/controllers/typeInsuController.js:12 (show)",
+      "service": "src/services/typeInsuService.js:7 (getTypeInsuById)",
+      "repository": "src/repositories/typeInsuRepository.js:12 (findById)",
+      "result": "Leitura de catálogo global; sem dado privado identificado."
+    },
+    {
+      "method": "POST",
+      "route": "/tipos-insulina",
+      "route_file": "src/routes/typeInsuRoutes.js:8",
+      "controller": "src/controllers/typeInsuController.js:22 (create)",
+      "service": "src/services/typeInsuService.js:49 (create)",
+      "repository": "src/repositories/typeInsuRepository.js:55 (create)",
+      "result": "Sem autenticação e sem autorização/posse; A05."
+    },
+    {
+      "method": "PUT",
+      "route": "/tipos-insulina/:id",
+      "route_file": "src/routes/typeInsuRoutes.js:9",
+      "controller": "src/controllers/typeInsuController.js:31 (update)",
+      "service": "src/services/typeInsuService.js:31 (updateById)",
+      "repository": "src/repositories/typeInsuRepository.js:12 (findById); src/repositories/typeInsuRepository.js:28 (updateById)",
+      "result": "Sem autenticação e sem autorização/posse; A05."
+    },
+    {
+      "method": "DELETE",
+      "route": "/tipos-insulina/:id",
+      "route_file": "src/routes/typeInsuRoutes.js:10",
+      "controller": "src/controllers/typeInsuController.js:41 (deleteById)",
+      "service": "src/services/typeInsuService.js:19 (deleteById)",
+      "repository": "src/repositories/typeInsuRepository.js:12 (findById); src/repositories/typeInsuRepository.js:21 (deleteById)",
+      "result": "Sem autenticação e sem autorização/posse; A05."
+    },
+    {
+      "method": "GET",
+      "route": "/usuarios",
+      "route_file": "src/routes/userRoutes.js:8",
+      "controller": "src/controllers/userController.js:3 (index)",
+      "service": "src/services/userService.js:4 (listUsers)",
+      "repository": "src/repositories/userRepository.js:4 (findAll)",
+      "result": "Sem autenticação e sem autorização/posse; A01."
+    },
+    {
+      "method": "GET",
+      "route": "/usuarios/:id",
+      "route_file": "src/routes/userRoutes.js:9",
+      "controller": "src/controllers/userController.js:22 (show)",
+      "service": "src/services/userService.js:8 (getUserById)",
+      "repository": "src/repositories/userRepository.js:42 (findById)",
+      "result": "Sem autenticação e sem autorização/posse; A02."
+    },
+    {
+      "method": "GET",
+      "route": "/usuarios/:tipo_usuario",
+      "route_file": "src/routes/userRoutes.js:10",
+      "controller": "src/controllers/userController.js:12 (showByType)",
+      "service": "src/services/userService.js:20 (getUsersByType)",
+      "repository": "src/repositories/userRepository.js:72 (findByType)",
+      "result": "Sombreado por GET /usuarios/:id; inspecionado, não alcançável no roteamento atual."
+    },
+    {
+      "method": "POST",
+      "route": "/usuarios",
+      "route_file": "src/routes/userRoutes.js:12",
+      "controller": "src/controllers/userController.js:43 (create)",
+      "service": "src/services/userService.js:37 (createUser)",
+      "repository": "src/repositories/userRepository.js:51 (findByEmail); src/repositories/userRepository.js:81 (create)",
+      "result": "Sem autenticação e sem autorização/posse; A06."
+    },
+    {
+      "method": "DELETE",
+      "route": "/usuarios/:id",
+      "route_file": "src/routes/userRoutes.js:13",
+      "controller": "src/controllers/userController.js:33 (deleteById)",
+      "service": "src/services/userService.js:25 (deleteById)",
+      "repository": "src/repositories/userRepository.js:12 (deleteById); src/repositories/userRepository.js:42 (findById)",
+      "result": "Sem autenticação e sem autorização/posse; A02."
+    },
+    {
+      "method": "PUT",
+      "route": "/usuarios/:id",
+      "route_file": "src/routes/userRoutes.js:14",
+      "controller": "src/controllers/userController.js:53 (update)",
+      "service": "src/services/userService.js:78 (updateUser)",
+      "repository": "src/repositories/userRepository.js:126 (update)",
+      "result": "Sem autenticação e sem autorização/posse; A02/A06."
+    }
+  ],
+  "scope": "API inteira no clone insulog-back-clone; frontend irmão insulog-mobile-front-clone em leitura complementar para permissões, segredos, saída e transporte. Código próprio, configurações, CI, documentação e histórico alcançável local; bundle web local inventariado. Sem acesso ao MySQL real, infraestrutura de produção ou exploração remota.",
+  "stack": "JavaScript CommonJS / Node.js (CI 24), Express 5.2.1; mysql2 com SQL manual, sem ORM/query builder; login por senha scrypt (fallback legado), sem token/sessão de autorização. Frontend Dart/Flutter, http e SharedPreferences. PDFKit/ExcelJS geram relatórios. CI GitHub Actions para Node/Flutter; nenhum Docker, Compose, Helm ou Terraform próprio encontrado.",
+  "limitations": [
+    "Severidades qualitativas pelo impacto e precondições; não são escores CVSS nem prova de comprometimento em produção.",
+    "Histórico: 19 commits da API e 17 do app, ambos clones não rasos; 1.001 e 334 blobs únicos, incluindo dependências vendorizadas na API. Reflogs, objetos órfãos, forks e refs remotas não presentes não foram auditados.",
+    "Os 49 registros de rota foram inspecionados. Reproduções fizeram 49 requisições: 48 rotas alcançáveis e uma checagem do sombreamento; SQL substituído em memória. Não validam constraints, permissões MySQL nem dados existentes no ambiente real.",
+    "A suíte original passou em 21 testes usando dependências isoladas em /tmp, após a instalação local original falhar por ausência de exceljs. Nenhum código de aplicação foi alterado.",
+    "Bundle web apareceu durante a auditoria e foi inspecionado em leitura; não foi compilado pelo auditor nem atestado como saída do HEAD. 40 arquivos inventariados; 1 match de padrão era tabela codificada do runtime, sem segredo configurado. SHA-256 de main.dart.js: a9bc4b23582622eee2bee7dc94a2e46b56d70eef839297127b86beab8474c03f.",
+    "Busca de padrões de segredo, com triagem dos candidatos, não garante ausência de todo segredo. Valores históricos confirmados foram ocultados; não foi testada validade nem reuso.",
+    "Arquivos de terceiros foram varridos para segredos, mas não receberam auditoria funcional de dependências. Arquivos binários e assets não tiveram revisão de conteúdo completa. Testes Flutter/dispositivo não foram executados."
+  ],
+  "recommendations": [
+    [
+      "P1",
+      "Restabelecer confiança no servidor",
+      "Implementar identidade autenticada e política de posse antes de expor dados reais; corrigir A01–A04 em conjunto. Restringir imediatamente acesso público enquanto a correção não estiver concluída."
+    ],
+    [
+      "P1",
+      "Conter exposição de credenciais",
+      "Rotacionar as duas senhas históricas (A07), remover senhas de logs (A08) e verificar retenção/acesso. A decisão de reescrever histórico deve ser coordenada e ocorre após a rotação."
+    ],
+    [
+      "P2",
+      "Autorizar manutenção e cadastro profissional",
+      "Definir política no backend para catálogos e tipo de conta (A05/A06); não depender do payload ou da UI."
+    ],
+    [
+      "P2",
+      "Proteger transporte e sessão do app",
+      "HTTPS em release (A10), sessão revogável e migração de saved_password (A09). Adaptar o cliente ao mecanismo de autenticação implementado."
+    ],
+    [
+      "P3",
+      "Prevenir regressões",
+      "Converter reproduções em testes negativos de 401/403/404 e estado preservado; cobrir anônimo, dono, outro usuário e profissional vinculado/não vinculado. Adicionar detecção de segredos ao CI."
+    ]
+  ]
+}

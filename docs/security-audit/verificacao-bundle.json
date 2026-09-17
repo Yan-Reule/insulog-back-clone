@@ -1,0 +1,247 @@
+{
+  "files": [
+    {
+      "file": "../insulog-mobile-front-clone/build/web/.last_build_id",
+      "bytes": 32,
+      "sha256": "08185bf5c29c8da089e3927de83063fcf6f5830e087d8ebedec88fb0dad6b0d9",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/AssetManifest.bin",
+      "bytes": 162,
+      "sha256": "070c2f6818144888d50c83c23f4fcf949aad67f47b8501aa40bc126bc7acdc8c",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/AssetManifest.bin.json",
+      "bytes": 218,
+      "sha256": "2dbe7cd852468bbb869c0be6a47f4985f9746d9d74244c93bd4bdd445c26a063",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/FontManifest.json",
+      "bytes": 82,
+      "sha256": "28b1eb2b3d2e1ad60b8c8b0f9100b1ccbf492f7fa97f5bebb51ea97e73926e7d",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/NOTICES",
+      "bytes": 1326353,
+      "sha256": "506eef30bebe29c6ebfb5c55df5f8812b656bd909b487fc8f89e360b7e984306",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/assets/images/google_icon_svg.svg",
+      "bytes": 1140,
+      "sha256": "6d399ca07e2091da15d80b65da4a7ea4b16915934bf39151ffc1802aff4b2f92",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/assets/images/insulogLogoSVG.svg",
+      "bytes": 7608,
+      "sha256": "7e928bb26a586e1466e816a23aab3f0ab1464fb4bda2d66fbb50971718fd6de3",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/fonts/MaterialIcons-Regular.otf",
+      "bytes": 11932,
+      "sha256": "295c5b8c485035138fac330339825b9ea2b75386e982047f8ccce20bf31b4042",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/shaders/ink_sparkle.frag",
+      "bytes": 8890,
+      "sha256": "2dca5ab93d4ec29e963f996f3916320ba60825e9537dfb149a68008c7a16b026",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/assets/shaders/stretch_effect.frag",
+      "bytes": 6737,
+      "sha256": "ab412f07a5b9b50b67a885b24dbe16929738ae28630407d6490c924caf0a3220",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/canvaskit.js",
+      "bytes": 86987,
+      "sha256": "bb559f6080c7d312ac2a912b4abec9f68ff3d3022d4a603c7796b9b31460642b",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/canvaskit.js.symbols",
+      "bytes": 1356926,
+      "sha256": "3ccb198725cdef9d0676094bdf89c8f118d2a48643e54d794022f0e5cac21a65",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/canvaskit.wasm",
+      "bytes": 7284349,
+      "sha256": "2898c0795cf4a694e86ee3445c7414c2503fbcb46967154762f50ebde988da04",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/chromium/canvaskit.js",
+      "bytes": 86226,
+      "sha256": "6018b12bd8ed37e6952eee72d59c1cf7ad707ccdb74a0a45190010f77edd9068",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/chromium/canvaskit.js.symbols",
+      "bytes": 1235870,
+      "sha256": "20b0dafc6fa554ae23c7760d1d09ee74df668b92b475f7ba7cb6cf930185ee40",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/chromium/canvaskit.wasm",
+      "bytes": 5428553,
+      "sha256": "ba4024133403777f41c709b9e76e9f4bdb76c73d33adba8645527a59d815d824",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/skwasm.js",
+      "bytes": 63537,
+      "sha256": "71d7d3e34bf71b52bdba3b588b103bba8148ba28de5754083e01b3398e7a6e1c",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/skwasm.js.symbols",
+      "bytes": 1540006,
+      "sha256": "72ff0eb1ea5cf6b8b1a78c1473640dd32fde01df3a6503d17e9a82a4ba7b5315",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/skwasm.wasm",
+      "bytes": 3593521,
+      "sha256": "a957befea55cf597eeebcf3286f1b88f463f3ad8bfc13e55aa8f5d34cd2ade4d",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/skwasm_heavy.js",
+      "bytes": 63650,
+      "sha256": "cec554b46ddcf4c0e63d799e0556d546f42d2c3f69316fb4f67ed776f6104558",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/skwasm_heavy.js.symbols",
+      "bytes": 1672152,
+      "sha256": "9a2ee9896274656d6cc6a8ae92a20c9e4fa60d134a413c97b1e52d8dc74ef5e6",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/skwasm_heavy.wasm",
+      "bytes": 5216023,
+      "sha256": "781a14fc7e9cd387ee6df4a056f62af7e940c60cc42ce04571cc2e810042c588",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/webparagraph/canvaskit.js",
+      "bytes": 76114,
+      "sha256": "3110e3e4d9b7b5657d336f253aaca8acca5777cde9319fb69ac302d6ff5a8b23",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/webparagraph/canvaskit.js.symbols",
+      "bytes": 963641,
+      "sha256": "754a1570410fe044416673195bc736b18084806aa87e26f5c3bb0121e84679a3",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/webparagraph/canvaskit.wasm",
+      "bytes": 3729073,
+      "sha256": "7a61c4ad71781875a80bbfc5ee6e49686dd190d629e0fe986d3ecc05ada58856",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/wimp.js",
+      "bytes": 59127,
+      "sha256": "8fd8a47480c6eb0a374d159912d0b3fb15661b41f5c113ecdd39c2f01f2bee46",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/wimp.js.symbols",
+      "bytes": 1813030,
+      "sha256": "eb9fd88577b7201ad79cf0c469cb067111379f33a97dbdd23ecdafbbef77c093",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/canvaskit/wimp.wasm",
+      "bytes": 3581483,
+      "sha256": "7474f6074c42c4be503c9059c9b5058e468a68a8917ac6c3607f0da4922f7e5a",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/favicon.png",
+      "bytes": 917,
+      "sha256": "7ab2525f4b86b65d3e4c70358a17e5a1aaf6f437f99cbcc046dad73d59bb9015",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/flutter.js",
+      "bytes": 12136,
+      "sha256": "2beb1ce6b159c71540aa66030af1d7964b6a92377cc78473745e02f97b74effe",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/flutter_bootstrap.js",
+      "bytes": 13094,
+      "sha256": "9d06aba7012eb3f8a6d7649b75e80e90b71482acf5ddca3bb09baf37d315dbc2",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/flutter_service_worker.js",
+      "bytes": 784,
+      "sha256": "a131df5ca46154cc4eb79044f7f5a14029c2f8bfccf8cef34e3ec3b5a9f5a88c",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/icons/Icon-192.png",
+      "bytes": 5292,
+      "sha256": "3dce99077602f70421c1c6b2a240bc9b83d64d86681d45f2154143310c980be3",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/icons/Icon-512.png",
+      "bytes": 8252,
+      "sha256": "baccb205ae45f0b421be1657259b4943ac40c95094ab877f3bcbe12cd544dcbe",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/icons/Icon-maskable-192.png",
+      "bytes": 5594,
+      "sha256": "d2c842e22a9f4ec9d996b23373a905c88d9a203b220c5c151885ad621f974b5c",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/icons/Icon-maskable-512.png",
+      "bytes": 20998,
+      "sha256": "6aee06cdcab6b2aef74b1734c4778f4421d2da100b0ff9e52b21b55240202929",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/index.html",
+      "bytes": 1502,
+      "sha256": "ed0299ad31813bba92d359281016d319164161f6cce5d63f542fe286745c7659",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/main.dart.js",
+      "bytes": 3271579,
+      "sha256": "a9bc4b23582622eee2bee7dc94a2e46b56d70eef839297127b86beab8474c03f",
+      "candidate_lines": [
+        34794
+      ]
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/manifest.json",
+      "bytes": 910,
+      "sha256": "f47b4433b593722d4ee4bdfefdd33eaa44ec928fbe7cbe7903bc89b41e315426",
+      "candidate_lines": []
+    },
+    {
+      "file": "../insulog-mobile-front-clone/build/web/version.json",
+      "bytes": 84,
+      "sha256": "84765b000fdee6b5d11debbc40a929fbbe1a9e9ce92e602d8fd6756bca6c013e",
+      "candidate_lines": []
+    }
+  ],
+  "note": "Artefato local apareceu durante a auditoria; não foi compilado pelo auditor, nem há atestado de correspondência com HEAD. Busca de padrões nas entradas JS/JSON/HTML, inventário dos demais arquivos; ausência de match não é prova absoluta de ausência de segredo. Chaves saved_password são nomes de armazenamento, não credenciais embutidas."
+}
